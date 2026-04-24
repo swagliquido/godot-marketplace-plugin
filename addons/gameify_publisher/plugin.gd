@@ -1,7 +1,7 @@
 @tool
 extends EditorPlugin
 
-const PublisherDock := preload("res://addons/godotarchive_publisher/publisher_dock.gd")
+const PublisherDock := preload("res://addons/gameify_publisher/publisher_dock.gd")
 
 var _dock: Control
 

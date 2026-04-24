@@ -1,6 +1,6 @@
 @tool
 extends RefCounted
-class_name GodotArchiveApi
+class_name GameifyApi
 
 # Thin wrapper around HTTPRequest. One instance per call — instantiate, connect,
 # kick off, await the signal, free.
@@ -9,18 +9,18 @@ class_name GodotArchiveApi
 # for every request on the node, so reusing one instance across concurrent calls
 # risks crossing streams. Cheaper to spin up a fresh one per call.
 
-const DEFAULT_BASE_URL := "https://api.godotarchive.com/apiv2"
+const DEFAULT_BASE_URL := "https://api.gameify.online/apiv2"
 
 
 static func base_url() -> String:
 	var settings := EditorInterface.get_editor_settings()
-	var override: String = settings.get_setting("godotarchive/api_base_url") if settings.has_setting("godotarchive/api_base_url") else ""
+	var override: String = settings.get_setting("gameify/api_base_url") if settings.has_setting("gameify/api_base_url") else ""
 	return override if not override.is_empty() else DEFAULT_BASE_URL
 
 
 static func api_key() -> String:
 	var settings := EditorInterface.get_editor_settings()
-	return settings.get_setting("godotarchive/api_key") if settings.has_setting("godotarchive/api_key") else ""
+	return settings.get_setting("gameify/api_key") if settings.has_setting("gameify/api_key") else ""
 
 
 ## Submit a game or game update. `metadata` is a Dictionary with keys:

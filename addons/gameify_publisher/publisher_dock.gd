@@ -1,11 +1,11 @@
 @tool
 extends VBoxContainer
 
-# Editor dock for publishing the current project to GodotArchive.
+# Editor dock for publishing the current project to Gameify.
 #
 # Layout:
 #   ┌──────────────────────────────────┐
-#   │ GodotArchive Publisher           │
+#   │ Gameify Publisher           │
 #   ├──────────────────────────────────┤
 #   │ API key: […………………] (Edit)       │  ← tap Edit to open EditorSettings
 #   │ Status:  (connected / not set)   │
@@ -21,13 +21,13 @@ extends VBoxContainer
 #   │              (o) Fixed: [ 500 ¢] │
 #   ├──────────────────────────────────┤
 #   │ HTML5 export: [ res://export  …] │  ← folder picker
-#   │ [ Upload to GodotArchive ]       │
+#   │ [ Upload to Gameify ]       │
 #   │ [ Show my submissions ]          │
 #   ├──────────────────────────────────┤
 #   │ Log: …                           │
 #   └──────────────────────────────────┘
 
-const GodotArchiveApi := preload("res://addons/godotarchive_publisher/api_client.gd")
+const GameifyApi := preload("res://addons/gameify_publisher/api_client.gd")
 
 const GENRES := ["Platformer", "Puzzle", "Action", "Adventure", "RPG", "Shooter",
 	"Strategy", "Simulation", "Racing", "Sports", "Rhythm", "Visual Novel", "Other"]
@@ -55,7 +55,7 @@ var _folder_dialog: FileDialog
 func _init() -> void:
 	# Programmatic build — simpler than maintaining a .tscn alongside this.
 	# Keeps the addon as a single importable folder (no scene path pitfalls).
-	name = "GodotArchive"
+	name = "Gameify"
 	set_v_size_flags(SIZE_EXPAND_FILL)
 	add_theme_constant_override("separation", 8)
 	_build_ui()
@@ -66,7 +66,7 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	add_child(_section_header("GodotArchive Publisher"))
+	add_child(_section_header("Gameify Publisher"))
 
 	# ── Status row ──
 	var status := HBoxContainer.new()
@@ -123,7 +123,7 @@ func _build_ui() -> void:
 	actions.name = "Actions"
 	var submit := Button.new()
 	submit.name = "Submit"
-	submit.text = "Upload to GodotArchive"
+	submit.text = "Upload to Gameify"
 	submit.pressed.connect(_on_submit_pressed)
 	actions.add_child(submit)
 	var my_games := Button.new()
@@ -237,7 +237,7 @@ func _make_price_setter(active: CheckBox) -> Callable:
 
 
 func _refresh_status() -> void:
-	var key := GodotArchiveApi.api_key()
+	var key := GameifyApi.api_key()
 	if key.is_empty():
 		_status_label.text = "No API key set"
 		_status_label.add_theme_color_override("font_color", Color(0.9, 0.4, 0.4))
@@ -253,14 +253,14 @@ func _on_edit_api_key_pressed() -> void:
 	# there rather than typing it into a plugin text field that might end
 	# up in version control / screenshots.
 	var settings := EditorInterface.get_editor_settings()
-	if not settings.has_setting("godotarchive/api_key"):
-		settings.set_setting("godotarchive/api_key", "")
-		settings.set_initial_value("godotarchive/api_key", "", false)
-	if not settings.has_setting("godotarchive/api_base_url"):
-		settings.set_setting("godotarchive/api_base_url", GodotArchiveApi.DEFAULT_BASE_URL)
-		settings.set_initial_value("godotarchive/api_base_url", GodotArchiveApi.DEFAULT_BASE_URL, false)
+	if not settings.has_setting("gameify/api_key"):
+		settings.set_setting("gameify/api_key", "")
+		settings.set_initial_value("gameify/api_key", "", false)
+	if not settings.has_setting("gameify/api_base_url"):
+		settings.set_setting("gameify/api_base_url", GameifyApi.DEFAULT_BASE_URL)
+		settings.set_initial_value("gameify/api_base_url", GameifyApi.DEFAULT_BASE_URL, false)
 	EditorInterface.get_base_control().get_viewport().gui_release_focus()
-	_log.append_text("\n[color=gray]Open Editor → Editor Settings → godotarchive section.[/color]")
+	_log.append_text("\n[color=gray]Open Editor → Editor Settings → gameify section.[/color]")
 	_refresh_status()
 
 
@@ -287,7 +287,7 @@ func _on_submit_pressed() -> void:
 
 	_submit_btn.disabled = true
 	_log.append_text("\n[b]Zipping…[/b] %s" % dir)
-	var tmp_zip := "user://godotarchive_upload_%d.zip" % Time.get_unix_time_from_system()
+	var tmp_zip := "user://gameify_upload_%d.zip" % Time.get_unix_time_from_system()
 	var zipped := _zip_export_dir(dir, ProjectSettings.globalize_path(tmp_zip))
 	if not zipped:
 		_log.append_text("\n[color=red]Failed to build zip. See output log.[/color]")
@@ -302,7 +302,7 @@ func _on_submit_pressed() -> void:
 		"genre": GENRES[_genre_opt.selected] if _genre_opt.selected >= 0 else "Other",
 		"price_cents": _selected_price_cents(),
 	}
-	var result: Dictionary = await GodotArchiveApi.submit_game(self, ProjectSettings.globalize_path(tmp_zip), metadata)
+	var result: Dictionary = await GameifyApi.submit_game(self, ProjectSettings.globalize_path(tmp_zip), metadata)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp_zip))
 
 	if result.ok:
@@ -311,7 +311,7 @@ func _on_submit_pressed() -> void:
 		if body is Dictionary and body.has("slug"):
 			slug = body["slug"]
 		_log.append_text("\n[color=green]Submitted for review.[/color] %s" % (
-			"[url]https://godotarchive.com/games/%s[/url]" % slug if not slug.is_empty() else ""
+			"[url]https://gameify.online/games/%s[/url]" % slug if not slug.is_empty() else ""
 		))
 	else:
 		var msg := "HTTP %d" % result.code
@@ -323,7 +323,7 @@ func _on_submit_pressed() -> void:
 
 func _on_my_submissions_pressed() -> void:
 	_log.append_text("\n[b]Fetching your submissions…[/b]")
-	var result: Dictionary = await GodotArchiveApi.list_my_games(self)
+	var result: Dictionary = await GameifyApi.list_my_games(self)
 	if not result.ok:
 		_log.append_text("\n[color=red]Fetch failed (HTTP %d)[/color]" % result.code)
 		return

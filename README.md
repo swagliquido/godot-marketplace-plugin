@@ -1,19 +1,19 @@
-# GodotArchive Publisher
+# Gameify Publisher
 
-One-click publishing from the Godot editor to [GodotArchive](https://godotarchive.com) — an itch.io-style marketplace built specifically for Godot HTML5 games.
+One-click publishing from the Godot editor to [Gameify](https://gameify.online) — an itch.io-style marketplace built specifically for Godot HTML5 games.
 
 ## Install
 
 1. Download the latest release (or clone this repo).
-2. Copy `addons/godotarchive_publisher/` into your project's `addons/` directory.
-3. Godot → **Project → Project Settings → Plugins → GodotArchive Publisher → Enable**.
-4. A new **GodotArchive** dock appears in the bottom-right panel.
+2. Copy `addons/gameify_publisher/` into your project's `addons/` directory.
+3. Godot → **Project → Project Settings → Plugins → Gameify Publisher → Enable**.
+4. A new **Gameify** dock appears in the bottom-right panel.
 
 ## Configure your API key
 
-1. Sign in at [godotarchive.com](https://godotarchive.com) and open **Settings → Developer → API keys**.
+1. Sign in at [gameify.online](https://gameify.online) and open **Settings → Developer → API keys**.
 2. Create a key scoped to **Publish**. Copy it.
-3. In Godot: **Editor → Editor Settings → godotarchive → Api Key** → paste it.
+3. In Godot: **Editor → Editor Settings → gameify → Api Key** → paste it.
 
 The plugin's status line should flip to **Connected**.
 
@@ -22,7 +22,7 @@ The plugin's status line should flip to **Connected**.
 1. Export your game as **HTML5** from **Project → Export** (any path — the plugin zips it for you).
 2. In the dock, fill in Title, Description, Tags, Genre, and Price.
 3. **HTML5 export dir** → point at the folder containing `index.html`.
-4. Click **Upload to GodotArchive**. The plugin zips, uploads, and enqueues for review.
+4. Click **Upload to Gameify**. The plugin zips, uploads, and enqueues for review.
 
 A submission goes through moderation before it's publicly searchable. The queue is human — the site owner is emailed on every submission and typically responds within 24 h. Click **My submissions** in the dock to check status without leaving Godot.
 
@@ -32,7 +32,7 @@ A submission goes through moderation before it's publicly searchable. The queue 
 - **Pay-what-you-want** — players choose any price ≥ €0, 5 % platform cut on paid transactions only.
 - **Fixed price** — minimum €0.50, 10 % platform cut. Flip to 3 % on a paid creator plan.
 
-Payments route through Stripe; GodotArchive never holds payout funds. Your Stripe Connect account (set up once on the site) receives the net amount directly.
+Payments route through Stripe; Gameify never holds payout funds. Your Stripe Connect account (set up once on the site) receives the net amount directly.
 
 ## Troubleshooting
 
