@@ -23,44 +23,87 @@ static func api_key() -> String:
 	return settings.get_setting("gameify/api_key") if settings.has_setting("gameify/api_key") else ""
 
 
-## Submit a game or game update. `metadata` is a Dictionary with keys:
-##   title, description, tags (Array[String]), genre, price_cents (int, 0 = free),
-##   update_of_game_id (optional — non-empty means this is an update to an
-##   existing game rather than a new submission).
+## Submit a game — 3-hop orchestration so large exports bypass Lambda's
+## sync-payload cap:
 ##
-## `zip_path` must be a pre-built HTML5 export archive (see publisher_dock's
-## `_zip_export_dir`). Returns a Dictionary: `{ok: bool, body: Variant, code: int}`.
+##   1. POST /games/submit-init  → mints a presigned S3 PUT URL and a
+##      game_id + upload_key pair scoped to the authed user.
+##   2. PUT  <upload_url>         → streams the zip straight into the
+##      staging bucket. No auth header; the URL itself is the credential.
+##   3. POST /games/submit-finalize → metadata + game_id + upload_key;
+##      server unpacks the zip into the games bucket, writes the DDB
+##      row, emails the reviewer.
+##
+## Returns `{ok: bool, body: Variant, code: int}` carrying the finalize
+## response (slug, review_eta_hours, runner_path, …).
 static func submit_game(host: Node, zip_path: String, metadata: Dictionary) -> Dictionary:
-	var req := HTTPRequest.new()
-	req.timeout = 120.0
-	host.add_child(req)
-
 	var zip_bytes := FileAccess.get_file_as_bytes(zip_path)
 	if zip_bytes.is_empty():
-		req.queue_free()
 		return {"ok": false, "body": "Export zip was empty or unreadable", "code": 0}
 
-	# Multipart body. Keeping this hand-rolled because Godot ships no helper
-	# and reaching for a 3rd-party crate for one HTTP call feels excessive.
-	var boundary := "GdArchBoundary-" + str(Time.get_unix_time_from_system()).md5_text()
-	var body := PackedByteArray()
-	body.append_array(_field(boundary, "metadata", JSON.stringify(metadata)))
-	body.append_array(_file_field(boundary, "export_zip", zip_path.get_file(), zip_bytes))
-	body.append_array(("--" + boundary + "--\r\n").to_utf8_buffer())
+	# Step 1 — presign.
+	var init := await _post_json(host, "/games/submit-init", {})
+	if not init.ok:
+		return init
+	var init_body: Dictionary = init.body
+	var upload_url: String = init_body.get("upload_url", "")
+	var upload_key: String = init_body.get("upload_key", "")
+	var game_id: String = init_body.get("game_id", "")
+	if upload_url.is_empty() or upload_key.is_empty() or game_id.is_empty():
+		return {"ok": false, "body": "submit-init missing fields", "code": 0}
 
-	var headers := [
-		"Authorization: Bearer " + api_key(),
-		"Content-Type: multipart/form-data; boundary=" + boundary,
-		"X-Client: godot-plugin/0.1.0",
-	]
-	var err := req.request_raw(base_url() + "/games/submit", headers, HTTPClient.METHOD_POST, body)
+	# Step 2 — presigned PUT. No API key header needed; URL is the
+	# credential. HTTPRequest doesn't let us skip the Host header, but
+	# Godot adds it correctly for the target URL.
+	var put_req := HTTPRequest.new()
+	put_req.timeout = 300.0
+	host.add_child(put_req)
+	var put_err := put_req.request_raw(
+		upload_url,
+		["Content-Type: application/zip"],
+		HTTPClient.METHOD_PUT,
+		zip_bytes,
+	)
+	if put_err != OK:
+		put_req.queue_free()
+		return {"ok": false, "body": "S3 PUT failed to start (err %d)" % put_err, "code": 0}
+	var put_result: Array = await put_req.request_completed
+	put_req.queue_free()
+	if put_result[1] < 200 or put_result[1] >= 300:
+		return {
+			"ok": false,
+			"body": "S3 PUT returned HTTP %d" % put_result[1],
+			"code": put_result[1],
+		}
+
+	# Step 3 — finalize. Merge server-returned ids with metadata.
+	var finalize_body := metadata.duplicate()
+	finalize_body["game_id"] = game_id
+	finalize_body["upload_key"] = upload_key
+	return await _post_json(host, "/games/submit-finalize", finalize_body)
+
+
+## Internal: POST JSON with Bearer auth, parse response. Used by both
+## submit steps + future authed calls.
+static func _post_json(host: Node, path: String, body: Dictionary) -> Dictionary:
+	var req := HTTPRequest.new()
+	req.timeout = 60.0
+	host.add_child(req)
+	var err := req.request(
+		base_url() + path,
+		[
+			"Authorization: Bearer " + api_key(),
+			"Content-Type: application/json",
+			"X-Client: godot-plugin/0.2.0",
+		],
+		HTTPClient.METHOD_POST,
+		JSON.stringify(body),
+	)
 	if err != OK:
 		req.queue_free()
 		return {"ok": false, "body": "HTTPRequest failed to start (err %d)" % err, "code": 0}
-
 	var result: Array = await req.request_completed
 	req.queue_free()
-	# result: [result_code, response_code, headers, body]
 	var response_code: int = result[1]
 	var response_body: PackedByteArray = result[3]
 	var parsed: Variant = null
